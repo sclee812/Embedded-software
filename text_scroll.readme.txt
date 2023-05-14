@@ -1,0 +1,92 @@
+Module development – Auto Scrolling Text 
+Created by – Terry Lee / SW2 team
+
+Data structure
+SCRLTXT_UICONFIG : UI related settings info – Font type / colour, background colour
+SCRLTXT_CREATEPARAM : Configuration parameter upon creating bitmap – Text and location
+SCRLTXT_UPDATEPARAM : Configuration parameter upon update – Scrolling direction, start and end position of the bitmap etc
+
+typedef struct tag_SCRLTXT_UICONFIG{
+	UINT16 bgColor;
+	UINT16  fontColor;
+	LCD_FONTID fontType;
+	LCD_FONTID fontType2;		// Fot alternative language: eg.Chinese font
+}SCRLTXT_UICONFIG;
+
+typedef struct tag_SCRLTXT_CREATEPARAM{
+	UINT8 pText[SCRLTXT_MAXWORDS];
+	UINT8 showWidth;
+	UINT8 posX;
+	UINT8 posY;
+	BOOL multi;
+}SCRLTXT_CREATEPARAM;
+
+typedef struct tag_SCRLTXT_UPDATEPARAM{
+	UINT8 posX;
+	UINT8 posY;
+	INT16 startIndex;		// start index of bitmap buffer for display
+	INT16 rightEndIndex;	// end index on the right for display
+	BOOL toRight;			// scrolling direction: left or right
+	UINT8 pause;			// scrolling pause when direction changes
+	UINT8 showWidth;		// width of scrolling region (in pixel)
+	UINT8 counter;			// disables scrolling for certain period
+	UINT8 unitPixel;		// how many pixels to be scrolled in single timer update
+	BOOL boost;			// for those who are impatient and furious.. :)
+	BOOL init;
+} SCRLTXT_UPDATEPARAM;
+
+Global variables
+extern SCRLTXT_UICONFIG scrlTxtUIConfig;	UI Configuration.
+extern SCRLTXT_CREATEPARAM scrlTxtCreate;	Creation info
+extern SCRLTXT_UPDATEPARAM scrlTxtUpdate;	Update info
+extern UINT8 scrlTxtTotalBitmap;		Bitmap array size
+extern LCD_BITMAP * scrlTxtBitmap;		Bitmap array
+extern BOOL scrlInit;			Initialization status
+
+
+Algorithm
+1.	Initialize – read data (Text, location, display region) 
+2.	Check if scroll is required or can be displayed within designated region 
+3.	Start (saving bitmap) – If scroll is required then the text to be displayed is saved as bitmap (display in backbuffer -> save as bitmap) 
+4.	Start the timer for scrolling 
+5.	Update – Bitmap is updated and displayed upon update timer callback 
+6.	Close – clear memory and reset the timer 
+
+Function API
+void SplitTextIntoMultiLine(char *pText, TEXT_VIEW *pTextView);
+	-> helper function/ Display across multiple lines if not fit in a single line
+void DisplayMultiLineText(char *pText, TEXT_VIEW *pTextView, UINT16 *pTextLen);
+	-> helper function/ Display multiple lined text
+void ScrollText_InitCreateParam(UINT8 *pText, UINT8 showWidth, UINT8 posX, UINT8 posY);
+	-> member function/ Initialize configuration info about text to be displayed
+void ScrollText_MakeMultiLines(UINT8 *pText, UINT8 showWidth, UINT8 posX, UINT8 posY); 
+	-> member function/ Save as bitmap – the text across multiple lines which is displayed in backbuffer
+void ScrollText_MakeSingleLine(UINT8 *pText, UINT8 showWidth, UINT8 posX, UINT8 posY); 
+	-> member function/ Save as bitmap - the single line text which is displayed in backbuffer
+void ScrollText_UpdateParam(void); 
+	-> member function/ Update the bitmap info upon update timer is called
+void ScrollText_Start(void); 
+	-> member function/ Start – if the scroll is required then start the scroll timer
+void ScrollText_Display(void); 
+	-> member function/ Display the updated bitmap
+void ScrollText_Close(void); 
+	-> member function/ Clear memory and reset timer
+BOOL ScrollText_ChkNeedToScrl(UINT8 *pText, UINT8 showWidth, UINT8 posX, UINT8 posY); 
+	-> member function/ Check if scroll is required – if text spans outside of the designated regions
+BOOL ScrollText_HandleEvent(INT16 prim); 
+	-> member function/ Process timer events
+
+
+Usages
+1.	ScrollText_HandleEvent(INT16 prim) – Process timer within message loop 
+2.	SCRLTXT_PUTTEXT(TEXT, SHOW_WIDTH, X, Y) – Display text (replace call to mmi_PutText())
+3.	SCRLTXT_CLOSE(); - called after exiting message loop – Clear memory and timer
+
+
+Source merge
+text_scroll.h – Module header
+text_scroll.c – Module implementation
+mmi_message.h – Add timers (x2)
+MSG_TIMER_SCRLTXT_START, MSG_TIMER_SCRLTXT_UPDATE
+mmi_menu.c – Use
+
